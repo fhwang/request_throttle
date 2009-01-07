@@ -47,6 +47,30 @@ class RequestThrottleTest < Test::Unit::TestCase
     res
   end
   
+  def test_one_hundred
+    assert_posts_accepted(100) do
+      @count = 0
+      threads = []
+      100.times do
+        threads << Thread.new do
+          port = (rand >= 0.5) ? 7000 : 7001
+          res = try_post port
+          while res.class == Net::HTTPServiceUnavailable
+            sleep 0.5
+            res = try_post port
+          end
+          synchronize do
+            @count += 1
+            if @count % 10 == 0
+              puts "count is #{@count}"
+            end
+          end
+        end
+      end
+      threads.each do |thread| thread.join; end
+    end
+  end
+  
   def test_only_one_at_a_time
     assert_posts_accepted(2) do
       thread_7000 = Thread.new do
