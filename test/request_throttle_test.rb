@@ -75,14 +75,13 @@ class RequestThrottleTest < Test::Unit::TestCase
     assert_posts_accepted(2) do
       thread_7000 = Thread.new do
         res = nil
-        synchronize do
-          @started_7000 = true
-          res = try_post 7000
-        end
+        @started_7000 = true
+        res = try_post 7000
         raise res.inspect unless res.class == Net::HTTPOK
         @finished_7000 = true
       end
       sleep 0.1 until @started_7000
+      sleep 0.1 # maybe this helps us get to try_post(7000) before try_post(7001)
       res = try_post 7001
       raise res.inspect unless res.class == Net::HTTPServiceUnavailable
       thread_7000.join
