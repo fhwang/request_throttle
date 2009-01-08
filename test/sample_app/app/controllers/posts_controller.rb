@@ -1,5 +1,5 @@
 class PostsController < ApplicationController
-  request_throttle :create, 1, :version => 'abcd'
+  request_throttle :create, 1
   
   def initialize
     @memcache_key = "posts_count"

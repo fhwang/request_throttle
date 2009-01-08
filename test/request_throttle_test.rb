@@ -74,7 +74,6 @@ class RequestThrottleTest < Test::Unit::TestCase
   def test_only_one_at_a_time
     assert_posts_accepted(2) do
       thread_7000 = Thread.new do
-        res = nil
         @started_7000 = true
         res = try_post 7000
         raise res.inspect unless res.class == Net::HTTPOK
