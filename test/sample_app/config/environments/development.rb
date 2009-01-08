@@ -19,7 +19,7 @@ memcache_options = {
 memcache_servers = [ '127.0.0.1:11211' ]
 
 # memcache caching
-config.cache_store = :mem_cache_store, memcache_servers, memcache_options
+config.cache_store = :libmemcached_store, memcache_servers, memcache_options
 
 # memcache session store
 config.action_controller.session_store = :mem_cache_store

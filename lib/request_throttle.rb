@@ -75,7 +75,7 @@ module RequestThrottle
           # decrementing just to be sure.
           req_count = Rails.cache.increment(mk, 0)
           if req_count && req_count > 0
-            Rails.cache.increment(mk, -1)
+            Rails.cache.decrement mk
           end
         end
       end
