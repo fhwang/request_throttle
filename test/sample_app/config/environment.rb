@@ -67,3 +67,4 @@ Rails::Initializer.run do |config|
 end
 
 RequestThrottle.version = 'abcd'
+

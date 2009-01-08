@@ -23,7 +23,17 @@ class RequestThrottleTest < Test::Unit::TestCase
           raise "Need the app to be running at port #{port}. Try \"cd test/sample_app && ./script/server -p #{port}\""
         end
       end
+      rails_code = "PostsController.max_req_count_for_create = nil"
+      `cd test/sample_app && ./script/runner "#{rails_code}"`
       @full_setup = true
+    end
+    @reset_max_req_count = false
+  end
+  
+  def teardown
+    if @reset_max_req_count
+      rails_code = "PostsController.max_req_count_for_create = 1"
+      `cd test/sample_app && ./script/runner "#{rails_code}"`
     end
   end
   
@@ -87,6 +97,24 @@ class RequestThrottleTest < Test::Unit::TestCase
       assert @finished_7000
       res = try_post 7001
       raise res.inspect unless res.class == Net::HTTPOK
+    end
+  end
+
+  def test_set_throttle_count_from_script_runner
+    @reset_max_req_count = true
+    rails_code = "PostsController.max_req_count_for_create = 2"
+    `cd test/sample_app && ./script/runner "#{rails_code}"`
+    assert_posts_accepted(2) do
+      thread_7000 = Thread.new do
+        @started_7000 = true
+        res = try_post 7000
+        raise res.inspect unless res.class == Net::HTTPOK
+      end
+      sleep 0.1 until @started_7000
+      sleep 0.1 # maybe this helps us get to try_post(7000) before try_post(7001)
+      res = try_post 7001
+      raise res.inspect unless res.class == Net::HTTPOK
+      thread_7000.join
     end
   end
 end
