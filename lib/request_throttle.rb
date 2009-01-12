@@ -75,7 +75,13 @@ module RequestThrottle
           # decrementing just to be sure.
           req_count = Rails.cache.increment(mk, 0)
           if req_count && req_count > 0
-            Rails.cache.decrement mk
+            if RAILS_GEM_VERSION =~ /^2\.1\./ &&
+              controller.cache_store.is_a?(ActiveSupport::Cache::MemCacheStore)
+              # dodging a bug in with MemCacheStore#decrement in Rails 2.1.x
+              Rails.cache.increment mk, -1
+            else
+              Rails.cache.decrement mk
+            end
           end
         end
       end

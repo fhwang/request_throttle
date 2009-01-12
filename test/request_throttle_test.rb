@@ -81,13 +81,13 @@ class RequestThrottle_2_2_2_Test < Test::Unit::TestCase
     check_processes
     @reset_max_req_count = false
     rails_code = "PostsController.max_req_count_for_create = nil"
-    `cd test/sample_app && ./script/runner -e #{rails_env} "#{rails_code}"`
+    `cd test/sample_app && RAILS_GEM_VERSION=#{rails_gem_version} ./script/runner -e #{rails_env} "#{rails_code}"`
   end
   
   def teardown
     if @reset_max_req_count
       rails_code = "PostsController.max_req_count_for_create = 1"
-      `cd test/sample_app && ./script/runner -e #{rails_env} "#{rails_code}"`
+      `cd test/sample_app && RAILS_GEM_VERSION=#{rails_gem_version} ./script/runner -e #{rails_env} "#{rails_code}"`
     end
   end
   
@@ -124,7 +124,7 @@ class RequestThrottle_2_2_2_Test < Test::Unit::TestCase
   def test_set_throttle_count_from_script_runner
     @reset_max_req_count = true
     rails_code = "PostsController.max_req_count_for_create = 2"
-    `cd test/sample_app && ./script/runner -e #{rails_env} "#{rails_code}"`
+    `cd test/sample_app && RAILS_GEM_VERSION=#{rails_gem_version} ./script/runner -e #{rails_env} "#{rails_code}"`
     assert_posts_accepted(2) do
       thread_7000 = Thread.new do
         @started_7000 = true
@@ -150,6 +150,20 @@ class RequestThrottle_2_1_2_LibmemcachedStoreTest < Test::Unit::TestCase
   def ports; [8000,8001]; end
     
   def rails_env; 'libmemcached_store'; end
+  
+  def rails_gem_version; '2.1.2'; end
+end
+
+class RequestThrottle_2_1_2_MemCacheStoreTest < Test::Unit::TestCase
+  include RequestThrottleTestMethods
+  
+  def setup
+    check_processes
+  end
+
+  def ports; [9000,9001]; end
+    
+  def rails_env; 'mem_cache_store'; end
   
   def rails_gem_version; '2.1.2'; end
 end

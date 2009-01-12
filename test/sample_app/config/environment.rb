@@ -66,5 +66,5 @@ Rails::Initializer.run do |config|
   # config.active_record.observers = :cacher, :garbage_collector
 end
 
-RequestThrottle.version = 'abcd'
+RequestThrottle.version = "#{RAILS_GEM_VERSION}-#{ENV['RAILS_ENV']}"
 
