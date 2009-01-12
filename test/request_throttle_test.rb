@@ -4,41 +4,37 @@ require 'monitor'
 require 'net/http'  
 require 'test/unit'
 
-class RequestThrottleTest < Test::Unit::TestCase
+module RequestThrottleTestMethods
   include MonitorMixin
+
+  @@memcache_checked = false
   
-  def setup
-    unless @full_setup
+  def check_processes
+    unless @@memcache_checked
       memcache = MemCache.new 'localhost:11211'
       begin
         memcache.get 'asdf'
       rescue MemCache::MemCacheError
         raise "Looks like you don't have memcache running. Try \"memcached -d -p 11211\""
       end
-      [7000,7001].each do |port|
+      @@memcache_checked = true
+    end
+    unless @mongrels_checked
+      ports.each do |port|
         http = Net::HTTP.new 'localhost', port
         begin
           resp, data = http.get '/'
         rescue Errno::ECONNREFUSED
-          raise "Need the app to be running at port #{port}. Try \"cd test/sample_app && ./script/server -e 2_2_2 -p #{port}\""
+          startup = "RAILS_GEM_VERSION=#{rails_gem_version} ./script/server -p #{port} -e #{rails_env}"
+          raise "Need the app to be running at port #{port}. Try \"cd test/sample_app && #{startup}\""
         end
       end
-      rails_code = "PostsController.max_req_count_for_create = nil"
-      `cd test/sample_app && ./script/runner -e 2_2_2 "#{rails_code}"`
-      @full_setup = true
-    end
-    @reset_max_req_count = false
-  end
-  
-  def teardown
-    if @reset_max_req_count
-      rails_code = "PostsController.max_req_count_for_create = 1"
-      `cd test/sample_app && ./script/runner -e 2_2_2 "#{rails_code}"`
+      @mongrels_checked = true
     end
   end
   
   def accepted_posts_count
-    Net::HTTP.get('localhost', '/posts', '7000').to_i
+    Net::HTTP.get('localhost', '/posts', ports.first).to_i
   end
   
   def assert_posts_accepted(difference)
@@ -56,6 +52,50 @@ class RequestThrottleTest < Test::Unit::TestCase
     end
     res
   end
+  
+  def test_only_one_at_a_time
+    assert_posts_accepted(2) do
+      thread1 = Thread.new do
+        @started_thread1 = true
+        res = try_post ports.first
+        raise res.inspect unless res.class == Net::HTTPOK
+        @finished_thread1 = true
+      end
+      sleep 0.1 until @started_thread1
+      sleep 0.1 # maybe this helps us get to try_post(7000) before
+                # try_post(7001)
+      res = try_post ports.last
+      raise res.inspect unless res.class == Net::HTTPServiceUnavailable
+      thread1.join
+      assert @finished_thread1
+      res = try_post ports.last
+      raise res.inspect unless res.class == Net::HTTPOK
+    end
+  end
+end
+
+class RequestThrottle_2_2_2_Test < Test::Unit::TestCase
+  include RequestThrottleTestMethods
+  
+  def setup
+    check_processes
+    @reset_max_req_count = false
+    rails_code = "PostsController.max_req_count_for_create = nil"
+    `cd test/sample_app && ./script/runner -e #{rails_env} "#{rails_code}"`
+  end
+  
+  def teardown
+    if @reset_max_req_count
+      rails_code = "PostsController.max_req_count_for_create = 1"
+      `cd test/sample_app && ./script/runner -e #{rails_env} "#{rails_code}"`
+    end
+  end
+  
+  def ports; [7000,7001]; end
+    
+  def rails_env; 'mem_cache_store'; end
+
+  def rails_gem_version; '2.2.2'; end
   
   def test_one_hundred
     assert_posts_accepted(100) do
@@ -80,30 +120,11 @@ class RequestThrottleTest < Test::Unit::TestCase
       threads.each do |thread| thread.join; end
     end
   end
-  
-  def test_only_one_at_a_time
-    assert_posts_accepted(2) do
-      thread_7000 = Thread.new do
-        @started_7000 = true
-        res = try_post 7000
-        raise res.inspect unless res.class == Net::HTTPOK
-        @finished_7000 = true
-      end
-      sleep 0.1 until @started_7000
-      sleep 0.1 # maybe this helps us get to try_post(7000) before try_post(7001)
-      res = try_post 7001
-      raise res.inspect unless res.class == Net::HTTPServiceUnavailable
-      thread_7000.join
-      assert @finished_7000
-      res = try_post 7001
-      raise res.inspect unless res.class == Net::HTTPOK
-    end
-  end
 
   def test_set_throttle_count_from_script_runner
     @reset_max_req_count = true
     rails_code = "PostsController.max_req_count_for_create = 2"
-    `cd test/sample_app && ./script/runner -e 2_2_2 "#{rails_code}"`
+    `cd test/sample_app && ./script/runner -e #{rails_env} "#{rails_code}"`
     assert_posts_accepted(2) do
       thread_7000 = Thread.new do
         @started_7000 = true
@@ -117,4 +138,18 @@ class RequestThrottleTest < Test::Unit::TestCase
       thread_7000.join
     end
   end
+end
+
+class RequestThrottle_2_1_2_LibmemcachedStoreTest < Test::Unit::TestCase
+  include RequestThrottleTestMethods
+  
+  def setup
+    check_processes
+  end
+
+  def ports; [8000,8001]; end
+    
+  def rails_env; 'libmemcached_store'; end
+  
+  def rails_gem_version; '2.1.2'; end
 end

@@ -1,6 +1,10 @@
 # SQLite version 3.x
 #   gem install sqlite3-ruby (not necessary on OS X Leopard)
-2_2_2:
+mem_cache_store:
+  adapter: sqlite3
+  database: db/development.sqlite3
+  timeout: 5000
+libmemcached_store:
   adapter: sqlite3
   database: db/development.sqlite3
   timeout: 5000
