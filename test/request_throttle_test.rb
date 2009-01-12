@@ -20,11 +20,11 @@ class RequestThrottleTest < Test::Unit::TestCase
         begin
           resp, data = http.get '/'
         rescue Errno::ECONNREFUSED
-          raise "Need the app to be running at port #{port}. Try \"cd test/sample_app && ./script/server -p #{port}\""
+          raise "Need the app to be running at port #{port}. Try \"cd test/sample_app && ./script/server -e 2_2_2 -p #{port}\""
         end
       end
       rails_code = "PostsController.max_req_count_for_create = nil"
-      `cd test/sample_app && ./script/runner "#{rails_code}"`
+      `cd test/sample_app && ./script/runner -e 2_2_2 "#{rails_code}"`
       @full_setup = true
     end
     @reset_max_req_count = false
@@ -33,7 +33,7 @@ class RequestThrottleTest < Test::Unit::TestCase
   def teardown
     if @reset_max_req_count
       rails_code = "PostsController.max_req_count_for_create = 1"
-      `cd test/sample_app && ./script/runner "#{rails_code}"`
+      `cd test/sample_app && ./script/runner -e 2_2_2 "#{rails_code}"`
     end
   end
   
@@ -103,7 +103,7 @@ class RequestThrottleTest < Test::Unit::TestCase
   def test_set_throttle_count_from_script_runner
     @reset_max_req_count = true
     rails_code = "PostsController.max_req_count_for_create = 2"
-    `cd test/sample_app && ./script/runner "#{rails_code}"`
+    `cd test/sample_app && ./script/runner -e 2_2_2 "#{rails_code}"`
     assert_posts_accepted(2) do
       thread_7000 = Thread.new do
         @started_7000 = true
