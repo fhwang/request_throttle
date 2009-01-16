@@ -1,7 +1,7 @@
 require 'rubygems'
-require 'memcache'
 require 'monitor'
 require 'net/http'  
+require 'test/test_helper'
 require 'test/unit'
 
 module RequestThrottleTestMethods
@@ -15,7 +15,7 @@ module RequestThrottleTestMethods
       begin
         memcache.get 'asdf'
       rescue MemCache::MemCacheError
-        raise "Looks like you don't have memcache running. Try \"memcached -d -p 11211\""
+        raise "Looks like you don't have memcache running. Try \"rake test:prepare\""
       end
       @@memcache_checked = true
     end
@@ -43,6 +43,16 @@ module RequestThrottleTestMethods
     count_at_end = accepted_posts_count
     assert_equal( difference, count_at_end - count_at_start )
   end
+    
+  def mongrel_config
+    TestProcesses.tc_class_names_to_mongrel_configs[self.class.name]
+  end
+  
+  def ports; mongrel_config[:ports]; end
+    
+  def rails_env; mongrel_config[:rails_env]; end
+  
+  def rails_gem_version; mongrel_config[:rails_gem_version]; end
   
   def try_post(port)
     req = Net::HTTP::Post.new '/posts/create'
@@ -90,12 +100,6 @@ class RequestThrottle_2_2_2_Test < Test::Unit::TestCase
       `cd test/sample_app && RAILS_GEM_VERSION=#{rails_gem_version} ./script/runner -e #{rails_env} "#{rails_code}"`
     end
   end
-  
-  def ports; [7000,7001]; end
-    
-  def rails_env; 'mem_cache_store'; end
-
-  def rails_gem_version; '2.2.2'; end
   
   def test_one_hundred
     assert_posts_accepted(100) do
@@ -146,12 +150,6 @@ class RequestThrottle_2_1_2_LibmemcachedStoreTest < Test::Unit::TestCase
   def setup
     check_processes
   end
-
-  def ports; [8000,8001]; end
-    
-  def rails_env; 'libmemcached_store'; end
-  
-  def rails_gem_version; '2.1.2'; end
 end
 
 class RequestThrottle_2_1_2_MemCacheStoreTest < Test::Unit::TestCase
@@ -160,10 +158,4 @@ class RequestThrottle_2_1_2_MemCacheStoreTest < Test::Unit::TestCase
   def setup
     check_processes
   end
-
-  def ports; [9000,9001]; end
-    
-  def rails_env; 'mem_cache_store'; end
-  
-  def rails_gem_version; '2.1.2'; end
 end
