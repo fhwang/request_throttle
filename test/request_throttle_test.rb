@@ -142,6 +142,23 @@ class RequestThrottle_2_2_2_Test < Test::Unit::TestCase
       thread_7000.join
     end
   end
+  
+  def test_reset_request_count
+    assert_posts_accepted(2) do
+      thread_7000 = Thread.new do
+        @started_7000 = true
+        res = try_post 7000
+        raise res.inspect unless res.class == Net::HTTPOK
+      end
+      sleep 0.1 until @started_7000
+      sleep 0.1 # maybe this helps us get to try_post(7000) before try_post(7001)
+      rails_code = "PostsController.reset_req_count_for_create"
+      `cd test/sample_app && RAILS_GEM_VERSION=#{rails_gem_version} ./script/runner -e #{rails_env} "#{rails_code}"`
+      res = try_post 7001
+      raise res.inspect unless res.class == Net::HTTPOK
+      thread_7000.join
+    end
+  end
 end
 
 class RequestThrottle_2_1_2_LibmemcachedStoreTest < Test::Unit::TestCase

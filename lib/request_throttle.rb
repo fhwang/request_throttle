@@ -1,10 +1,30 @@
 module RequestThrottle
   mattr_accessor :version
+  
+  def self.included(controller)
+    controller.extend ClassMethods
+  end
+  
+  def self.init_req_count(key)
+    # This must start at 0 for some reason
+    Rails.cache.write(key, '0', :expires_in => 1.month)
+  end
 
   def self.max_req_count_memcache_key(c_class, c_action)
     mk = "#{c_class}##{c_action}:max_req_count"
     mk << "?version=#{version}" if version
     mk
+  end
+  
+  def self.req_count_memcache_key(c_class, c_action)
+    mk = "#{c_class}##{c_action}:req_count"
+    mk << "?version=#{version}" if version
+    mk
+  end
+  
+  def self.reset_req_count(c_class, c_action)
+    key = RequestThrottle.req_count_memcache_key(c_class, c_action)
+    init_req_count key
   end
   
   def self.set_max_req_count_in_memcache(c_class, c_action, max_req_count)
@@ -16,16 +36,6 @@ module RequestThrottle
     end
   end
   
-  def self.included(controller)
-    controller.extend ClassMethods
-  end
-  
-  def self.req_count_memcache_key(c_class, c_action)
-    mk = "#{c_class}##{c_action}:req_count"
-    mk << "?version=#{version}" if version
-    mk
-  end
-  
   module ClassMethods
     def request_throttle(action, max_req_count)
       if perform_caching
@@ -33,6 +43,9 @@ module RequestThrottle
         class_eval <<-EVAL
           def self.max_req_count_for_#{action}=(max_req_count)
             RequestThrottle.set_max_req_count_in_memcache(#{self.name}, #{action.inspect}, max_req_count)
+          end
+          def self.reset_req_count_for_#{action}
+            RequestThrottle.reset_req_count(#{self.name}, #{action.inspect})
           end
         EVAL
       end
@@ -82,8 +95,7 @@ module RequestThrottle
     end
     
     def init_req_count(mk)
-      # This must start at 0 for some reason
-      Rails.cache.write(mk, '0', :expires_in => 1.month)
+      RequestThrottle.init_req_count mk
     end
     
     def max_req_count(controller)
