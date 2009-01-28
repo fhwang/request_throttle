@@ -56,16 +56,12 @@ module RequestThrottle
     
     def filter(controller)
       mk = memcache_key controller
-      req_count = Rails.cache.increment(mk, 0)
-      if req_count
-        req_count = req_count.to_i
-        if req_count >= max_req_count(controller)
-          controller.send(:render, :status => 503, :text => '') and return
-        else
-          Rails.cache.increment mk, 1
-        end
-      else
-        init_req_count mk
+      init_req_count(mk) unless Rails.cache.increment(mk, 0)
+      incremented_req_count = Rails.cache.increment(mk, 1).to_i
+      if incremented_req_count > max_req_count(controller)
+        controller.send(:render, :status => 503, :text => '')
+        decrement_memcache controller.cache_store, mk
+        return
       end
       begin
         yield
@@ -87,8 +83,7 @@ module RequestThrottle
     
     def init_req_count(mk)
       # This must start at 0 for some reason
-      Rails.cache.write(mk, '0', :expires_in => 1.month )
-      Rails.cache.increment mk, 1
+      Rails.cache.write(mk, '0', :expires_in => 1.month)
     end
     
     def max_req_count(controller)
